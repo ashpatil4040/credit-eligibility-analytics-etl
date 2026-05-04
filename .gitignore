@@ -1,0 +1,49 @@
+# ── Secrets & local config ────────────────────────────────────────────────────
+.env
+*.key
+*.pem
+*.p12
+
+# ── Data files (may contain PII / financial data, also very large) ────────────
+data/raw/
+data/staging/
+data/processed/
+
+# Keep the directory structure in git
+!data/raw/.gitkeep
+!data/staging/.gitkeep
+!data/processed/.gitkeep
+
+# ── Airflow runtime artefacts ─────────────────────────────────────────────────
+logs/
+!logs/.gitkeep
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+env/
+.env.*
+!.env.example
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+# Named volumes are managed by Docker; no local artefacts to ignore here
+
+# ── OS artefacts ──────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.vscode/settings.json
+.idea/
+*.iml
