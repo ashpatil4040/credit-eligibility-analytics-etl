@@ -56,6 +56,7 @@ def setup_telemetry(service_name: str = "credit-risk-etl") -> None:
         return
 
     endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://jaeger:4317")
+    logs_exporter = os.getenv("OTEL_LOGS_EXPORTER", "otlp").strip().lower()
 
     # Resource = the metadata bundle stamped on every span/metric/log
     # Think of it as: "this telemetry came from this service running in this env"
@@ -84,9 +85,19 @@ def setup_telemetry(service_name: str = "credit-risk-etl") -> None:
     metrics.set_meter_provider(MeterProvider(resource=resource, metric_readers=[reader]))
 
     # ── Logs ──────────────────────────────────────────────────────────────────
-    # LoggingHandler bridges the standard Python logging system into OTel.
-    # Any logger.info/warning/error call is forwarded to Jaeger as a log record.
-    if _LOGS_SDK_AVAILABLE:
+    # When OTEL_LOGS_EXPORTER=none: shut down any pre-existing OTLP log exporters
+    # that Airflow or other packages may have set up before this module was imported,
+    # then do NOT add a new one.  This eliminates the recurring UNIMPLEMENTED errors
+    # from Jaeger (which supports traces/metrics but not the OTLP logs signal).
+    if _LOGS_SDK_AVAILABLE and logs_exporter == "none":
+        root_logger = logging.getLogger()
+        for handler in list(root_logger.handlers):
+            if isinstance(handler, LoggingHandler):
+                lp = getattr(handler, "_logger_provider", None)
+                if lp is not None and hasattr(lp, "shutdown"):
+                    lp.shutdown()   # stops BatchLogRecordProcessor background thread
+                root_logger.removeHandler(handler)
+    elif _LOGS_SDK_AVAILABLE:
         logger_provider = LoggerProvider(resource=resource)
         logger_provider.add_log_record_processor(
             BatchLogRecordProcessor(OTLPLogExporter(endpoint=endpoint, insecure=True))

@@ -64,11 +64,12 @@ x-airflow-common:
     AIRFLOW__CORE__EXECUTION_API_SERVER_URL: 'http://airflow-apiserver:8080/execution/'
     AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW__API_AUTH__JWT_SECRET}
     AIRFLOW__API_AUTH__JWT_ISSUER: ${AIRFLOW__API_AUTH__JWT_ISSUER:-airflow}
+    AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session
     OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger:4317"
     OTEL_EXPORTER_OTLP_INSECURE: "true"
     OTEL_TRACES_EXPORTER: "otlp"
     OTEL_METRICS_EXPORTER: "otlp"
-    OTEL_LOGS_EXPORTER: "otlp"
+    OTEL_LOGS_EXPORTER: "none"
     OTEL_TRACES_SAMPLER: "always_on"
     OTEL_PYTHON_LOG_CORRELATION: "true"
     OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=local,pipeline.name=credit-risk-etl"
@@ -88,6 +89,7 @@ x-airflow-common:
      - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
      - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
      - ${AIRFLOW_PROJ_DIR:-.}/scripts:/opt/airflow/scripts
+     - ${AIRFLOW_PROJ_DIR:-.}/agent:/opt/airflow/agent
      - ${AIRFLOW_PROJ_DIR:-.}/data:/opt/airflow/data
   user: "${AIRFLOW_UID:-50000}:0"
 
@@ -120,7 +122,31 @@ services:
       - "16686:16686"   # Jaeger UI
       - "4317:4317"     # OTLP gRPC receiver
     restart: always
-  
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_NUM_PARALLEL=1
+      - OLLAMA_MAX_LOADED_MODELS=1
+      - OLLAMA_NOHISTORY=1
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    restart: always
+    # GPU support — uncomment if you have an NVIDIA GPU
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu] 
+
   redis:
     profiles:
       - celery
@@ -366,5 +392,22 @@ services:
       airflow-init:
         condition: service_completed_successfully
 
+  credit-risk-agent:
+    <<: *airflow-common
+    environment:
+      <<: *airflow-common-env
+      OTEL_SERVICE_NAME: "credit-risk-agent"
+      AGENT_POLL_INTERVAL: "60"
+      AGENT_NON_INTERACTIVE: "true"
+    command: python /opt/airflow/agent/event_loop.py
+    restart: unless-stopped
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-apiserver:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
 volumes:
   postgres-db-volume:
+  ollama-models:

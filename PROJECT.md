@@ -46,6 +46,7 @@ locally on a single machine using the `LocalExecutor` — no distributed workers
 | `airflow-dag-processor` | custom build | Parses DAG files, detects changes | internal |
 | `airflow-triggerer` | custom build | Handles deferred/async operators | internal |
 | `jaeger` | jaegertracing/all-in-one:1.57 | OpenTelemetry trace + metric backend | `16686` (UI), `4317` (OTLP gRPC) |
+| `credit-risk-agent` | custom build | Autonomous AI agent — polls DAGs, diagnoses failures, runs approval-gated remediation | internal |
 
 ### Executor: LocalExecutor
 
@@ -83,6 +84,18 @@ credit-risk-airflow-etl/
 │   ├── raw_ingestion_dag.py         # Stage 1 DAG
 │   ├── feature_engineering_dag.py   # Stage 2 DAG
 │   └── eligibility_analytics_dag.py # Stage 3 DAG
+│
+├── agent/                       # AI agent layer (Phases 3–9)
+│   ├── event_loop.py            # Phase 9: autonomous polling service
+│   ├── agent_core.py            # Phase 3/6/8: AgentExecutor + risk gate + audit
+│   ├── tools.py                 # Phase 4: read-only Airflow tools
+│   ├── airflow_tools.py         # Phase 5: action tools (trigger/retry/clear)
+│   ├── risk_classifier.py       # Phase 6: deterministic tool risk classification
+│   ├── approval_gate.py         # Phase 7: Gmail human-in-the-loop approval
+│   ├── notifier.py              # Phase 7: Gmail SMTP/IMAP transport
+│   ├── audit.py                 # Phase 8: OTel audit spans to Jaeger
+│   ├── llm_adapter.py           # Phase 2: Groq/Ollama LLM abstraction
+│   └── cli.py                   # Interactive CLI for manual agent queries
 │
 ├── plugins/
 │   └── dag_instrumentation.py   # OTel DAG/task callbacks (auto-loaded by Airflow)
@@ -245,7 +258,32 @@ AIRFLOW_WEBSERVER_PORT=8081            # host port for Airflow UI
 OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
 OTEL_TRACES_SAMPLER=always_on
 OTEL_PYTHON_LOG_CORRELATION=true
+
+# Airflow REST API (used by agent)
+AIRFLOW_API_BASE_URL=http://airflow-apiserver:8080
+AIRFLOW_API_USERNAME=airflow
+AIRFLOW_API_PASSWORD=change_me_local_only
+
+# LLM provider — "groq" (cloud) or "ollama" (local)
+LLM_PROVIDER=groq
+LLM_TEMPERATURE=0.0
+GROQ_API_KEY=<your-key>
+GROQ_MODEL=llama-3.3-70b-versatile
+
+# Agent tuning
+AGENT_MAX_ITERATIONS=20
+AGENT_MAX_EXECUTION_TIME=180
+AGENT_POLL_INTERVAL=60
+AGENT_NON_INTERACTIVE=false   # set true in the Docker service
+
+# Gmail approval gate
+GMAIL_ADDRESS=you@gmail.com
+GMAIL_APP_PASSWORD=<app-password>
+APPROVAL_TIMEOUT_SECONDS=300
 ```
+
+See `.env.example` for a fully annotated template with generation instructions.
+See [AI_INTEGRATION.md](AI_INTEGRATION.md) for the complete AI agent reference.
 
 ### Key Airflow environment variables (set in `docker-compose.yaml`)
 

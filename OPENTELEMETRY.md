@@ -343,7 +343,7 @@ Set in `docker-compose.yaml` (shared `x-airflow-common` env block) and overridea
 | `OTEL_EXPORTER_OTLP_INSECURE` | `true` | Skip TLS (Docker internal network) |
 | `OTEL_TRACES_EXPORTER` | `otlp` | Export traces via OTLP protocol |
 | `OTEL_METRICS_EXPORTER` | `otlp` | Export metrics via OTLP protocol |
-| `OTEL_LOGS_EXPORTER` | `otlp` | Export logs via OTLP protocol |
+| `OTEL_LOGS_EXPORTER` | `none` | Keep app logs in stdout/files; disable separate OTLP log signal export |
 | `OTEL_TRACES_SAMPLER` | `always_on` | Capture every span (use `parentbased_traceidratio` in production) |
 | `OTEL_PYTHON_LOG_CORRELATION` | `true` | Standard flag; our `TraceContextFormatter` implements this manually |
 | `OTEL_RESOURCE_ATTRIBUTES` | `deployment.environment=local,pipeline.name=credit-risk-etl` | Stamped on all telemetry from all services |
